@@ -1,98 +1,62 @@
-const router = require('express').Router();
-const {
-  Scores,
-  User
-} = require('../models');
-// Import the custom middleware
-const withAuth = require('../utils/auth');
+const router = require("express").Router();
+const { Post, Comment, User } = require("../models");
 
+// get all posts for homepage
+router.get("/", (req, res) => {
+  Post.findAll({
+    include: [User],
+  })
+    .then((dbPostData) => {
+      const posts = dbPostData.map((post) => post.get({ plain: true }));
 
-// GET all galleries for homepage
-router.get('/', async (req, res) => {
-  try {
-    res.render('homepage', {
-      loggedIn: req.session.loggedIn,
+      res.render("all-posts", { posts });
+    })
+    .catch((err) => {
+      res.status(500).json(err);
     });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json(err);
-  }
 });
 
-router.get('/game', (req, res) => {
-  try {
-  res.render('game');
-  }catch (err) {
-    console.log(err);
-    res.status(500).json(err);
-  }
+// get single post
+router.get("/post/:id", (req, res) => {
+  Post.findByPk(req.params.id, {
+    include: [
+      User,
+      {
+        model: Comment,
+        include: [User],
+      },
+    ],
+  })
+    .then((dbPostData) => {
+      if (dbPostData) {
+        const post = dbPostData.get({ plain: true });
+
+        res.render("single-post", { post });
+      } else {
+        res.status(404).end();
+      }
+    })
+    .catch((err) => {
+      res.status(500).json(err);
+    });
 });
 
-router.get('/login', (req, res) => {
+router.get("/login", (req, res) => {
   if (req.session.loggedIn) {
-    res.redirect('/');
+    res.redirect("/");
     return;
   }
-  res.render('login');
+
+  res.render("login");
 });
 
-router.get('/register', (req, res, next) => {
+router.get("/signup", (req, res) => {
   if (req.session.loggedIn) {
-    res.redirect('/');
+    res.redirect("/");
     return;
   }
-  res.render('signup');
-});
 
-router.get('/highscore', async (req, res) => {
-  if (req.session.loggedIn) {
-    const scoresData = await Scores.findAll({
-      limit: 10,
-      order: [
-        ["scores", "DESC"],
-      ],
-    })
-    const userscoresJson = JSON.stringify(scoresData, null, 2);
-    const parsedScore = JSON.parse(userscoresJson);
-    const user_id = [];
-    const userScores = [];
-    for (var i = 0; i < parsedScore.length; i++) {
-      user_id.push(parsedScore[i].userid);
-    }
-    for (var i = 0; i < parsedScore.length; i++) {
-      userScores.push(parsedScore[i].scores);
-    }
-    const userName = [];
-    for (var i = 0; i < user_id.length; i++) {
-      const playerName = await User.findOne({
-        where: {
-          id: user_id[i]
-        }
-      })
-      userName.push(playerName.username.toUpperCase());
-    }
-    res.render('highscore', {
-      user_id,
-      userName,
-      userScores,
-      loggedIn: req.session.loggedIn,
-    })
-  } else {
-    res.render('login');
-  }
-});
-
-router.post('/score', async (req, res) => {
-  try {
-    const dbScoreData = await Scores.create({
-      userid: req.body.userid,
-      scores: req.body.scores,
-    });
-    res.status(201).json(dbScoreData)
-  } catch (err) {
-    console.log(err);
-    res.status(500).json(err);
-  }
+  res.render("signup");
 });
 
 module.exports = router;
